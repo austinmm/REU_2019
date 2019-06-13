@@ -1,10 +1,5 @@
-import json  # Used to decode and encode json objects
-from collections import namedtuple  # Used to convert a dictionary to a python object
 import csv  # Used to export the data from Github's API to a CSV file
-import time # Used to sleep the program until more API calls can be made to Github
 from datetime import datetime, timedelta
-
-
 '''
 * To use the 'import requests' you must install the library first
 * Ensure that you have pip installed, if not then... "pip install --user pipenv"
@@ -12,28 +7,6 @@ from datetime import datetime, timedelta
 '''
 import requests  # Used to make HTTP request to Github's API
 
-
-# ***** User Info *****
-# owner_id: The id number of the user
-# owner_name: The owner of the project (Github User Name)
-# owner_type: The type of user
-
-# ***** Repo Info *****
-# html_url: The web-page of the repo
-# url: The api url to the repo
-# languages_url: Provides the api call to retrieve all languages used in project
-# name: The name of the project
-# language: The primary language used
-# size: size of the project as a whole
-# created_at: The date/time the repo was created
-# pushed_at: The date/time the repo was last pushed to
-# updated_at: The date/time the repo was last updated
-# stargazers_count, watchers_count, watchers): The amount of other Github users who have starred this repo
-# forks: The amount of times this repo has been forked
-# has_issues: If user has an issue or not
-# open_issues, open_issues_count: The amount of unresolved issues in repo
-# score: The score of the repo
-# subscribers_count: The amount of Github users who are Watching this repo (in repo api)
 '''
        * Overall Github API V3 Guide: https://developer.github.com/v3/
        
@@ -57,6 +30,10 @@ import requests  # Used to make HTTP request to Github's API
            per_page: 1-100
 '''
 
+# ***** Global Variables *****
+username = ""
+password = ""
+
 def write_to_csv(list_of_repos, file_name):
     # Creates/Overwrites a csv file to write to
     print("Writing Repositories to CSV File...")
@@ -69,7 +46,7 @@ def write_to_csv(list_of_repos, file_name):
         for repo in list_of_repos:
             # If the repo is not a multi-language project then we ignore it
             writer.writerow(repo.values())
-    print("Finished Writing Repositories to '%s.csv'" %file_name)
+    print("Finished Writing Repositories to '%s.csv'" % file_name)
 
 
 def update_repo_languages(list_of_repos):
@@ -80,7 +57,8 @@ def update_repo_languages(list_of_repos):
     for repo in list_of_repos:
         if 'languages_url' in repo:
             api_string = repo['languages_url']
-            result = requests.get(api_string, auth=('austinmm', 'github.getPassword();'))
+            global username; global password
+            result = requests.get(api_string, auth=(username, password))
             repo['language'] = result.json()
             # If the repo is not a multi-language project then we return false
             if len(repo['language']) > 1:
@@ -95,7 +73,7 @@ def update_repo_languages(list_of_repos):
 def get_page_of_repos(page_num, order_by, date_updated, date_created):
     '''
         This call will get all <public> repositories on github that...
-        * Have <2300> or more stars
+        * Have <4250> or more stars
         * Were pushed/updated on or after <date_updated>
         * Were created no later than <date_created>
         * Are <not> mirrored repos
@@ -108,8 +86,10 @@ def get_page_of_repos(page_num, order_by, date_updated, date_created):
               + 'q=stars:>=4250+is:public+mirror:false+archived:false'\
               + '+pushed:>=' + date_updated + '+created:>=' + date_created\
               + '&sort=stars&per_page=100&order=' + order_by + '&page=' + str(page_num)
-    if page_num == 1: print(api_str)
-    result = requests.get(api_str, auth=('austinmm', 'github.getPassword();'), headers={"Accept": "application/vnd.github.mercy-preview+json"})#topics
+    if page_num == 1:
+        print(api_str)
+    global username; global password
+    result = requests.get(api_str, auth=(username, password), headers={"Accept": "application/vnd.github.mercy-preview+json"})#topics
     return result.json()
 
 
@@ -140,7 +120,8 @@ def update_repo_data(list_of_repos):
     for repo in list_of_repos:
         if 'url' in repo:
             api_string = repo['url']
-            result = requests.get(api_string, auth=('austinmm', 'github.getPassword();'), headers={"Accept": "application/vnd.github.mercy-preview+json"})
+            global username; global password
+            result = requests.get(api_string, auth=(username, password), headers={"Accept": "application/vnd.github.mercy-preview+json"})
             updated_repo = dict(result.json())
             updated_repo['score'] = repo['score']
             # If the repo is not a multi-language project then we return false
@@ -180,9 +161,18 @@ def repo_created_date():
     date = datetime.today() - timedelta(days=days)
     return date.strftime("%Y-%m-%d")
 
+def basic_auth():
+    print("Github Username: ", end="")
+    global username
+    username = str(input())
+    print("Github Password: ", end="")
+    global password
+    password = str(input())
+
 
 if __name__ == '__main__':
     # Retrieves repo data from Github by page
+    basic_auth()
     date_updated = repo_updated_date()
     date_created = repo_created_date()
     list_of_repos = get_repos(date_updated, date_created)
