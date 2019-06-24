@@ -1,10 +1,6 @@
 import csv  # Used to export the data from Github's API to a CSV file
 from datetime import datetime, timedelta
-'''
-* To use the 'import requests' you must install the library first
-* Ensure that you have pip installed, if not then... "pip install --user pipenv"
-* Now install the 'requests' Library... "pipenv install requests"
-'''
+from time import sleep
 import requests  # Used to make HTTP request to Github's API
 
 '''
@@ -51,26 +47,28 @@ def write_to_csv(list_of_repos, file_name):
 
 def update_repo_languages(list_of_repos):
     print("Updating Repository Language Data...")
-    updated_repos = []
     current_repo = 1
     repo_count = len(list_of_repos)
     for repo in list_of_repos:
         if 'languages_url' in repo:
-            api_string = repo['languages_url']
-            global username; global password
-            result = requests.get(api_string, auth=(username, password))
-            repo['language'] = result.json()
-            # If the repo is not a multi-language project then we return false
-            if len(repo['language']) > 1:
-                updated_repos.append(repo)
+            repo['language'] = http_get_call(repo['languages_url'])
             percent_complete = (current_repo / repo_count) * 100
-            print("Percentage Complete: %.2f" % percent_complete)
+            print("Percentage Complete (Language): %.2f" % percent_complete)
             current_repo += 1
-    return updated_repos
+
+
+def http_get_call(url):
+    global username
+    global password
+    result = requests.get(url, auth=(username, password), headers={"Accept": "application/vnd.github.mercy-preview+json"})
+    if result.status_code != 200:
+        print("Invalid API Call:", result.reason)
+        exit()
+    return result.json()
 
 
 # Makes an HTTP Get call to Github to retrieve the repos specified by the api string parameters
-def get_page_of_repos(page_num, order_by, date_updated, date_created):
+def get_page_of_repos(page_num, order_by, star_count, date_updated, date_created):
     '''
         This call will get all <public> repositories on github that...
         * Have <4250> or more stars
@@ -82,32 +80,32 @@ def get_page_of_repos(page_num, order_by, date_updated, date_created):
         * Their <star> count
         * In <desc, asc> order
     '''
-    api_str = 'https://api.github.com/search/repositories?'\
-              + 'q=stars:>=4250+is:public+mirror:false+archived:false'\
+    url = 'https://api.github.com/search/repositories?'\
+              + 'q=stars:' + star_count + '+is:public+mirror:false+archived:false'\
               + '+pushed:>=' + date_updated + '+created:>=' + date_created\
-              + '&sort=stars&per_page=100&order=' + order_by + '&page=' + str(page_num)
+              + '&sort=stars&per_page=100&order=' + order_by + '&page=' + str(page_num)  # 4250
     if page_num == 1:
-        print(api_str)
-    global username; global password
-    result = requests.get(api_str, auth=(username, password), headers={"Accept": "application/vnd.github.mercy-preview+json"})#topics
-    return result.json()
+        print(url)
+    return http_get_call(url)
 
 
 def get_repos(date_updated, date_created):
     list_of_repos = []
     orders = ["asc", "desc"]
+    stars = ["4250..*", "2350..4249"]
     print("Obtaining Repositories from Github...")
-    for order_by in orders:
-        for page_num in range(1, 11, 1):
-            # Gets repos from github in json format
-            json_repos = get_page_of_repos(page_num, order_by, date_updated, date_created)
-            # json_repos['items'] = list of repo dictionary objects OR is not a valid key
-            if 'items' in json_repos:
-                # If 'items' is a key in the 'json_repos' dictionary then add new repos to the end of 'list_of_repos'
-                list_of_repos += json_repos['items']
-            else:
-                # If 'items' is not a valid key in the 'json_repos' dictionary then there are no more repos to read in
-                break
+    for star_count in stars:
+        for order_by in orders:
+            for page_num in range(1, 11, 1):
+                # Gets repos from github in json format
+                json_repos = get_page_of_repos(page_num, order_by, star_count, date_updated, date_created)
+                # json_repos['items'] = list of repo dictionary objects OR is not a valid key
+                if 'items' in json_repos:
+                    # If 'items' is a key in the 'json_repos' dictionary then add new repos to the end of 'list_of_repos'
+                    list_of_repos += json_repos['items']
+                else:
+                    # If 'items' is not a valid key in the 'json_repos' dictionary then there are no more repos to read in
+                    break
     print("%d Repositories have been read in from Github" % len(list_of_repos))
     return list_of_repos
 
@@ -117,20 +115,43 @@ def update_repo_data(list_of_repos):
     updated_repos = []
     current_repo = 1
     repo_count = len(list_of_repos)
-    for repo in list_of_repos:
-        if 'url' in repo:
-            api_string = repo['url']
-            global username; global password
-            result = requests.get(api_string, auth=(username, password), headers={"Accept": "application/vnd.github.mercy-preview+json"})
-            updated_repo = dict(result.json())
-            updated_repo['score'] = repo['score']
-            # If the repo is not a multi-language project then we return false
-            if len(repo['topics']) > 0:
-                updated_repos.append(repo)
+    for original_repo in list_of_repos:
+        if 'url' in original_repo:
+            result = http_get_call(original_repo['url'])
+            updated_repo = dict(result)
+            updated_repo['score'] = original_repo['score']
+            updated_repos.append(updated_repo)
             percent_complete = (current_repo / repo_count) * 100
-            print("Percentage Complete: %.2f" % percent_complete)
+            print("Percentage Complete (Update): %.2f" % percent_complete)
             current_repo += 1
     return updated_repos
+
+
+def clean_repos(list_of_repos):
+    language_dict = {}
+    updated_repos = []
+    for repo in list_of_repos:
+        repo_langs = dict(repo['language'])
+        repo_desc = str(repo['description'])
+        if len(repo_langs) > 0 and len(repo_desc) > 5:
+            language_dict.update(repo_langs)
+            updated_repos.append(repo)
+
+    list_of_repos = updated_repos
+    languages = [x.lower() for x in language_dict.keys()]
+    for repo in list_of_repos:
+        repo['topics'] = clean_topics(repo, languages)
+        if len(repo['topics']) <= 0:
+            updated_repos.remove(repo)
+    return updated_repos
+
+
+def clean_topics(repo, str_to_remove):
+    topics_list = [x.lower() for x in list(repo['topics'])]
+    for string in str_to_remove:
+        if string in topics_list:
+            topics_list.remove(string)
+    return topics_list
 
 
 def update_repo_fields(list_of_repos, repo_fields_wanted):
@@ -178,13 +199,21 @@ if __name__ == '__main__':
     list_of_repos = get_repos(date_updated, date_created)
     original_repo_count = len(list_of_repos)
     list_of_repos = update_repo_data(list_of_repos)
-    list_of_repos = update_repo_languages(list_of_repos)
-    write_to_csv(list_of_repos, 'Github_Repos')
+    sleep(3600)  # one hour
+    update_repo_languages(list_of_repos)
+    list_of_repos = clean_repos(list_of_repos)
+    write_to_csv(list_of_repos, 'Original_Repos')
+    '''
     repo_fields_wanted = ['id', 'name', 'full_name', 'created_at', 'pushed_at',
                           'updated_at', 'size', 'has_issues', 'forks',
                           'score', 'open_issues', 'subscribers_count',
                           'stargazers_count', 'language', 'topics',
                           'description', 'html_url', 'url', 'owner']
+    '''
+    repo_fields_wanted = ['size', 'forks', 'score',
+                          'open_issues', 'subscribers_count',
+                          'stargazers_count', 'language',
+                          'topics', 'description', 'owner']
     list_of_repos = update_repo_fields(list_of_repos, repo_fields_wanted)
     final_repo_count = len(list_of_repos)
     # Writes repo data to csv file
