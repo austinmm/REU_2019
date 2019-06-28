@@ -92,7 +92,7 @@ def get_page_of_repos(page_num, order_by, star_count, date_updated, date_created
 def get_repos(date_updated, date_created):
     list_of_repos = []
     orders = ["asc", "desc"]
-    stars = ["4250..*", "2350..4249"]
+    stars = ["4281..*", "2350..4280"]
     print("Obtaining Repositories from Github...")
     for star_count in stars:
         for order_by in orders:
@@ -138,11 +138,12 @@ def clean_repos(list_of_repos):
             updated_repos.append(repo)
 
     list_of_repos = updated_repos
+    updated_repos = []
     languages = [x.lower() for x in language_dict.keys()]
     for repo in list_of_repos:
         repo['topics'] = clean_topics(repo, languages)
-        if len(repo['topics']) <= 0:
-            updated_repos.remove(repo)
+        if len(repo['topics']) > 0:
+            updated_repos.append(repo)
     return updated_repos
 
 
