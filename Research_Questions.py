@@ -4,19 +4,20 @@ import ast  # Used to reformat json string to be properly loaded into python dic
 import statistics
 import copy
 from collections import Counter
-from itertools import combinations
+from itertools import chain, combinations
+import abc
+import json
 
-class Research_Stats:
+
+class Research_Stats(metaclass=abc.ABCMeta):
     AP  = "All"
     SLP = "Single-Language"
     MLP = "Multi-Language"
     Project_Types = [AP, SLP, MLP]
 
     def __init__(self):
-        self.repo_keys = []
         self.list_of_repos = []
         self.repositories_stats = []
-        self.languages_stats = {}
         self.repo_count = 0
 
     @staticmethod
@@ -37,7 +38,14 @@ class Research_Stats:
 
     @staticmethod
     def jsonString_to_object(json_string):
-        return ast.literal_eval(json_string)
+        value = ''
+        try:
+            value = ast.literal_eval(json_string)
+        except SyntaxError:
+            value = json_string
+        except ValueError:
+            value = json_string
+        return value
 
     @staticmethod
     def calculate_top_dict_key(dictionary, exclude_key):
@@ -59,13 +67,14 @@ class Research_Stats:
             stat_dict['var'] = round(statistics.variance(array), 2)
         return str(stat_dict)
 
-    # This function reads in all the rows, repo dictionary objects, from the csv file
-    def read_in_rows(self, file_name):
+    # This function reads in all the rows of a csv file and prepares them for processing
+    def read_in_data(self, file_path, file_name, class_name):
+        list_of_objects = []
         # Opens the CSV file for reading
-        with open(file_name + '.csv', 'r') as csv_file:  # "/content/drive/My Drive/Austin Marino/Colab App/" +
+        file_name = file_path + file_name + '.csv'
+        with open(file_name, 'r') as csv_file:
             reader = csv.reader(csv_file)
             is_header_row = True
-            headers = {}
             tuple_format = {}
             # Every row is a unique repository
             for row in reader:
@@ -73,34 +82,79 @@ class Research_Stats:
                 if is_header_row:
                     is_header_row = False # We only want to execute this conditional once
                     # Creates the field names for our python object from csv header row fields
-                    self.repo_keys = row
                     for index in range(0, len(row), 1):
-                        field = row[index]
+                        field = row[index].replace(" ", "_")
                         # key is index of the column and value is the column name
                         tuple_format[index] = field  # i.e. {1: 'name', 2: 'id'}
-                        # vice-versa
-                        headers[field] = index  # i.e. {'name': 1, 'id': 2}
                     continue
-                # These lines convert dictionaries and list strings into actual python versions
-                row[headers['language']] = Research_Stats.jsonString_to_object(row[headers['language']])
-                row[headers['topics']] = Research_Stats.jsonString_to_object(row[headers['topics']])
-                row[headers['owner']] = Research_Stats.jsonString_to_object(row[headers['owner']])
-                # This line converts all the repository rows into python objects under the class name "Repository"
-                repo_object = namedtuple("Repository", tuple_format.values())(*row)
-                self.list_of_repos.append(repo_object)
+                # Formats the row's fields into their correct type
+                for index in range(0, len(row), 1):
+                    row[index] = Research_Stats.jsonString_to_object(row[index])
+                # This line converts the row into an python objects
+                new_object = namedtuple(class_name, tuple_format.values())(*row)
+                list_of_objects.append(new_object)
+        return list_of_objects
+
+    @abc.abstractmethod
+    def write_data(self, file_path):
+        pass
+
+    def process_repository_data(self, file_path, file_name):
+        self.list_of_repos = self.read_in_data(file_path, file_name, "Repository")
         self.repo_count = len(self.list_of_repos)
         print("Repositories Processed: %d" % self.repo_count)
+        index = 1
+        for repo in self.list_of_repos:
+            current_repository = Repository_Stats(repo)
+            self.repositories_stats.append(current_repository)
+            self.update_statistics(current_repository)
+            print("Repository %d: Percentage Complete: %.2f" % (index, (index / self.repo_count * 100)))
+            index += 1
+        self.write_data(file_path)
 
-    def write_to_csv(self):
+    @abc.abstractmethod
+    def update_statistics(self, current_repository):
+        pass
+
+
+class RQ1_Stats(Research_Stats):
+
+    def __init__(self):
+        super(RQ1_Stats, self).__init__()
+        self.languages_stats = {}
+
+    def update_statistics(self, current_repository):
+        for language in current_repository.language_dict:
+            if language not in self.languages_stats:
+                self.languages_stats[language] = Language_Stats(language)
+            self.languages_stats[language].update(current_repository)
+
+    def write_data(self, file_path):
         # Creates/Overwrites a csv file to write to
-        print("Writing Research Data to CSV Files...")
-        self.write_language_data()
+        self.write_repo_data(file_path)
+        self.write_lang_data(file_path)
 
-    def write_language_data(self):
+    def write_repo_data(self, file_path):
+        # Creates/Overwrites a csv file to write to
+        print("Writing Repository Data to CSV File...")
+        file_name = file_path + 'RQ1_Repositories.csv'
+        with open(file_name, 'w') as csv_file:
+            writer = csv.writer(csv_file)
+            # Writes the dictionary keys to the csv file
+            writer.writerow(Repository_Stats.Header_Names)
+            # Writes all the values of each index of dict_repos as separate rows in the csv file
+            for repo in self.repositories_stats:
+                # If the repo is not a multi-language project then we ignore it
+                row = repo.create_row()
+                writer.writerow(row)
+        csv_file.close()
+        print("Finished Writing Repository Data to '%s.csv'" % file_name)
+
+    def write_lang_data(self, file_path):
         # Creates/Overwrites a csv file to write to
         print("Writing Language Data to CSV Files...")
         for projectType in Research_Stats.Project_Types:
-            file_name = 'RQ1_' + projectType + '.csv'
+            file_name = file_path + 'RQ1_' + projectType + '.csv'
             with open(file_name, 'w') as csv_file:
                 writer = csv.writer(csv_file)
                 # Writes the dictionary keys to the csv file
@@ -108,24 +162,61 @@ class Research_Stats:
                 # Writes all the values of each index of dict_repos as separate rows in the csv file
                 for language, lang_object in self.languages_stats.items():
                     # If the repo is not a multi-language project then we ignore it
-                    writer.writerow(lang_object.create_row(projectType))
+                    row = lang_object.create_row(projectType)
+                    writer.writerow(row)
             csv_file.close()
-            print("Finished Writing Repositories to '%s.csv'" % file_name)
+            print("Finished Writing Language Data to '%s.csv'" % file_name)
 
-    def process_repository_data(self):
-        index = 1
-        for repo in self.list_of_repos:
-            current_repository = Repository_Stats(repo)
-            self.repositories_stats.append(current_repository)
-            self.update_language_statistics(current_repository)
-            print("Repository %d: Percentage Complete: %.2f" % (index, (index / self.repo_count * 100)))
-            index += 1
+    def process_language_data(self, file_path, file_name):
+        values = self.read_in_data(file_path, file_name, "Language")
+        keys = [x.Language_Name for x in values]
+        self.languages_stats = Research_Stats.create_dictionary(keys, values)
 
-    def update_language_statistics(self, current_repository):
-        for language in current_repository.language_dict:
-            if language not in self.languages_stats:
-                self.languages_stats[language] = Language_Stats(language)
-            self.languages_stats[language].update(current_repository)
+    # Byte Distribution Statistics
+    def byte_distribution_stats(self, stat_key):
+        if stat_key is not None:
+            return {key: value.Byte_Distribution_Statistics[stat_key] for key, value in self.languages_stats.items()}
+        return {key: value.Byte_Distribution_Statistics for key, value in self.languages_stats.items()}
+
+    # Bytes Written Statistics
+    def bytes_written_stats(self, stat_key):
+        if stat_key is not None:
+            return {key: value.Bytes_Written_Statistics[stat_key] for key, value in self.languages_stats.items()}
+        return {key: value.Bytes_Written_Statistics for key, value in self.languages_stats.items()}
+
+    # Occurrences
+    def occurrence_counts(self):
+        return {key: value.Occurrences for key, value in self.languages_stats.items()}
+
+    # Most Frequent Language Combination
+    def language_combinations(self):
+        return {key: value.Most_Frequent_Language_Combination for key, value in self.languages_stats.items()}
+
+    # Most Frequent Topic
+    def topic_frequencies(self):
+        return {key: value.Most_Frequent_Topic for key, value in self.languages_stats.items()}
+
+    # Primary Language Occurrences
+    def primary_language_counts(self):
+        return {key: value.Primary_Language_Occurrences for key, value in self.languages_stats.items()}
+
+    # Language Ranking Statistics
+    def ranking_stats(self, stat_key):
+        if stat_key is not None:
+            return {key: value.Language_Ranking_Statistics[stat_key] for key, value in self.languages_stats.items()}
+        return {key: value.Language_Ranking_Statistics for key, value in self.languages_stats.items()}
+
+    # Languages Used Statistics
+    def languages_used_stats(self, stat_key):
+        if stat_key is not None:
+            return {key: value.Languages_Used_Statistics[stat_key] for key, value in self.languages_stats.items()}
+        return {key: value.Languages_Used_Statistics for key, value in self.languages_stats.items()}
+
+    # Topics Used Statistics
+    def topics_used_stats(self, stat_key):
+        if stat_key is not None:
+            return {key: value.Topics_Used_Statistics[stat_key] for key, value in self.languages_stats.items()}
+        return {key: value.Topics_Used_Statistics for key, value in self.languages_stats.items()}
 
 
 class Language_Stats:
@@ -154,51 +245,32 @@ class Language_Stats:
         # self.byte_distribution: List of percentage of bytes written out of all bytes in repo in this language
         self.byte_distribution = {Research_Stats.AP: [], Research_Stats.SLP: [], Research_Stats.MLP: []}
 
-    def single_language_update(self, repo_data, byte_size):
-        self.topics[Research_Stats.SLP] = Research_Stats.combine_dictionaries(
-            self.topics[Research_Stats.SLP],
+    def update_data(self, key, repo_data, byte_size, current_ordering, lang_combos):
+        self.language_combos[key] = Research_Stats.combine_dictionaries(
+            self.language_combos[key], lang_combos)
+        self.topics[key] = Research_Stats.combine_dictionaries(
+            self.topics[key],
             repo_data.topics_dict)
-        self.times_used[Research_Stats.SLP] += 1
-        self.bytes_written[Research_Stats.SLP].append(byte_size)
-        self.topics_used[Research_Stats.SLP].append(repo_data.topics_used)
-        self.ordering[Research_Stats.SLP].append(1)
-        self.languages_used[Research_Stats.SLP].append(1)
-        self.byte_distribution[Research_Stats.SLP].append(byte_size / repo_data.byte_size)
-
-    def multi_language_update(self, repo_data, byte_size, current_ordering):
-        self.language_combos[Research_Stats.MLP] = self.language_combos[Research_Stats.AP]
-        self.topics[Research_Stats.MLP] = Research_Stats.combine_dictionaries(
-            self.topics[Research_Stats.MLP],
-            repo_data.topics_dict)
-        self.times_used[Research_Stats.MLP] += 1
-        self.bytes_written[Research_Stats.MLP].append(byte_size)
-        self.ordering[Research_Stats.MLP].append(current_ordering)
-        self.languages_used[Research_Stats.MLP].append(repo_data.languages_used)
-        self.topics_used[Research_Stats.MLP].append(repo_data.topics_used)
-        self.byte_distribution[Research_Stats.MLP].append(byte_size / repo_data.byte_size)
+        self.times_used[key] += 1
+        self.ordering[key].append(current_ordering)
+        self.bytes_written[key].append(byte_size)
+        self.byte_distribution[key].append(byte_size / repo_data.byte_size)
+        self.languages_used[key].append(repo_data.languages_used)
+        self.topics_used[key].append(repo_data.topics_used)
 
     def update(self, repo_data):
         # Amount of bytes written in this language in the current repository instance
         byte_size = repo_data.language_dict[self.language_name]
         # Dictionary of language combos that include this language in the key with all values set to 1
         lang_combos = self.create_combo_dict(repo_data.language_combinations, self.language_name)
-        # Enters Values into Dictionaries under the key "All" (ALL Projects)
-        self.language_combos[Research_Stats.AP] = Research_Stats.combine_dictionaries(self.language_combos[Research_Stats.AP], lang_combos)
-        self.topics[Research_Stats.AP] = Research_Stats.combine_dictionaries(self.topics[Research_Stats.AP], repo_data.topics_dict)
-        self.times_used[Research_Stats.AP] += 1
-        self.bytes_written[Research_Stats.AP].append(byte_size)
         # List of all the keys from 'language_dict' sorted by their byte sizes (Max Value First)
         lang_byte_order = Research_Stats.sort_dictionary_into_list(repo_data.language_dict, True)
         # Locates the Index of this language in the  list ands one for actual positioning
         current_ordering = lang_byte_order.index(self.language_name) + 1
-        self.ordering[Research_Stats.AP].append(current_ordering)
-        self.languages_used[Research_Stats.AP].append(repo_data.languages_used)
-        self.topics_used[Research_Stats.AP].append(repo_data.topics_used)
-        self.byte_distribution[Research_Stats.AP].append(byte_size / repo_data.byte_size)
-        if repo_data.isMultiLanguage:
-            self.multi_language_update(repo_data, byte_size, current_ordering)
-        else:
-            self.single_language_update(repo_data, byte_size)
+        key = Research_Stats.AP
+        self.update_data(key, repo_data, byte_size, current_ordering, lang_combos)
+        key = Research_Stats.MLP if repo_data.isMultiLanguage else Research_Stats.SLP
+        self.update_data(key, repo_data, byte_size, current_ordering, lang_combos)
 
     def create_combo_dict(self, combo_list, filter_key):
         filtered_combos = list(filter(lambda x: filter_key in x and x != [filter_key], combo_list))
@@ -252,11 +324,18 @@ class Language_Stats:
 
 class Repository_Stats:
 
+    Header_Names = ["Score", "Multi-Language", "Languages Used", "Main Language",
+                    "All Languages", "Language Combinations", "Topics Used", "Topics",
+                    "Description", "Description NLP", "Owner Type", "Open Issues"
+                    "Stars", "Watchers", "Forks"]
+
     def __init__(self, repo):
         # Dictionary of languages as keys with values the amount of bytes written in said language
         self.language_dict = repo.language
         # Amount of bytes written in this language in the current repository instance
         self.byte_size = sum(list(self.language_dict.values()))
+        # String value of the primary language, in bytes written, of the current repo
+        self.main_language = Research_Stats.calculate_top_dict_key(self.language_dict, None)
         # Amount of languages used in current repository instance
         self.languages_used = len(self.language_dict)
         # Dictionary of language combos that include this language in the key with all values set to 1
@@ -269,30 +348,116 @@ class Repository_Stats:
         self.topics_used = len(self.topics_list)
         # Dictionary of topics as keys with all values set to 1
         self.topics_dict = Research_Stats.create_dictionary(self.topics_list, [1] * self.topics_used)
-        self.topic_combinations = []
+        self.description = repo.description
+        self.nlp_description = ''
         self.owner_type = repo.owner['type']
-        self.open_issues = int(repo.open_issues)
-        self.stars = int(repo.stargazers_count)
-        self.watchers = int(repo.subscribers_count)
+        self.open_issues = repo.open_issues
+        self.stars = repo.stargazers_count
+        self.watchers = repo.subscribers_count
+        self.forks = repo.forks
+        self.score = repo.score
+
+    def create_row(self):
+        # "Score"
+        values = [self.score]
+
+        # "Multi-Language"
+        data = self.isMultiLanguage
+        values.append(data)
+
+        # "Languages Used"
+        data = self.languages_used
+        values.append(data)
+
+        # "Main Language"
+        data = self.main_language
+        values.append(data)
+
+        # "All Languages"
+        data = list(self.language_dict.keys())
+        values.append(data)
+
+        # "Language Combinations"
+        data = self.language_combinations
+        values.append(data)
+
+        # "Topics Used"
+        data = self.topics_used
+        values.append(data)
+
+        # "Topics"
+        data = self.topics_list
+        values.append(data)
+
+        # "Description"
+        data = self.description
+        values.append(data)
+
+        # "Description NLP"
+        data = self.nlp_description
+        values.append(data)
+
+        # "Owner Type"
+        data = self.owner_type
+        values.append(data)
+
+        # "Open Issues"
+        data = self.open_issues
+        values.append(data)
+
+        # "Stars"
+        data = self.stars
+        values.append(data)
+
+        # "Watchers"
+        data = self.watchers
+        values.append(data)
+
+        # "Forks"
+        data = self.forks
+        values.append(data)
+
+        return values
 
     def create_unique_combo_list(self, dictionary, dict_count):
         combos = []
         if dict_count > 5:
             print("This repo uses %d languages; however, the combo limit is 20 languages" % dict_count)
             return combos
-        languages = list(dictionary.keys())
-        for i in range(0, dict_count + 1, 1):
-            sub_combo = [list(x) for x in combinations(languages, i)]
+        items = list(dictionary.keys())
+        for i in range(2, dict_count + 1, 1):
+            sub_combo = [list(x) for x in combinations(items, i)]
             if len(sub_combo) > 0:
                 combos.extend(sub_combo)
-        combos.remove([])
         return combos
 
+    def _create_unique_combo_list(self,  dictionary, dict_count):
+        combos = []
+        if dict_count > 20:
+            print("This repo uses %d languages; however, the combo limit is 20 languages" % dict_count)
+            #return combos
+        items = list(dictionary.keys())
+        combos = list(chain(*map(lambda x: combinations(items, x), range(2, dict_count + 1))))
+        return combos
+
+    def __create_unique_combo_list(self, dictionary, dict_count):
+        combo = []
+        if dict_count > 20:
+            print("This repo uses %d languages; however, the combo limit is 20 languages" % dict_count)
+            #return combos
+        items = list(dictionary)  # allows duplicate elements
+        combo = list(chain.from_iterable(combinations(items, r) for r in range(2, dict_count + 1)))
+        return combo
 
 # Start Point of Program
-research_data = Research_Stats()
-research_data.read_in_rows("Revised_Repos")
-# Creates a Language_stats object from language and topics data
-research_data.process_repository_data()
-research_data.write_to_csv()
+research_data = RQ1_Stats()
+file_path = ""   # "/content/drive/My Drive/Austin Marino/Colab App/"
+file_name = "Revised_Repos"
+research_data.process_repository_data(file_path, file_name)
+'''
+file_name = "RQ1_All"
+research_data.process_language_data(file_path, file_name)
+vals = research_data.byte_distribution_stats(None)
+vals = research_data.languages_used_stats('avg')
 print("There are a total of %d unique programing languages" % research_data.repo_count)
+'''
