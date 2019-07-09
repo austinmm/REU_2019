@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from time import sleep
 import requests  # Used to make HTTP request to Github's API
 
-'''
+"""
        * Overall Github API V3 Guide: https://developer.github.com/v3/
        
        * Repository Search Query Parameters: https://help.github.com/en/articles/searching-for-repositories
@@ -24,7 +24,7 @@ import requests  # Used to make HTTP request to Github's API
            https://developer.github.com/v3/#pagination
            page: n
            per_page: 1-100
-'''
+"""
 
 # ***** Global Variables *****
 username = ""
