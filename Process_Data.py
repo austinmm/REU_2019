@@ -5,6 +5,8 @@ from collections import namedtuple  # namedtuple()
 import numpy as np  # percentile()
 # Checks if a path to file exist
 from pathlib import Path
+# Communicate with linux terminal
+import subprocess
 # Safely converts strings into the correct python object
 import ast  # literal_eval()
 import statistics  # mean(), stdev(), variance()
@@ -16,12 +18,21 @@ from collections import Counter
 from progressbar import ProgressBar  # ProgressBar()
 # Deep Copies a python object
 import copy  # deepcopy()
+# Translates strings from one natural language to another
+import googletrans
+# List of all stop words in the English Language
+import nltk; nltk.download('stopwords')
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
 # Reads/Writes in a CSV formatted file
 import csv  # reader()
 import sys  # sys.maxsize
 # Allows code to read in large CSV files
 csv.field_size_limit(sys.maxsize)
-
+# Used to convert Language Codes to Language names
+language_identifier = googletrans.LANGUAGES
+# lemmatization words using the NLTK library
+lemmatizer = WordNetLemmatizer()
 
 
 class Process_Data:
@@ -74,12 +85,12 @@ class Process_Data:
         return str(stat_dict)
 
     @staticmethod
-    def create_unique_combo_list(dictionary, dict_count):
+    def create_unique_combo_list(dictionary, dict_count, max_combo_count, min_combo_count=1):
         combos = []
         items = list(dictionary.keys())
-        if dict_count < 2:
+        if dict_count < min_combo_count or dict_count > max_combo_count:
             return combos
-        for i in range(2, dict_count + 1, 1):
+        for i in range(min_combo_count, dict_count + 1, 1):
             sub_combo = [list(x) for x in combinations(items, i)]
             if len(sub_combo) > 0:
                 combos.extend(sub_combo)
@@ -132,3 +143,64 @@ class Process_Data:
             print("Error: Too many results within percentiles specified.")
             return {}
         return results
+
+    @staticmethod
+    def clean_text_for_nlp(text, join_text=False):
+        words = nltk.word_tokenize(text)
+        # Removes all punctuation, special characters and digits from text
+        # str.isalnum(): Return True if all characters in 'word' are alphanumeric
+        words = [word for word in words if word.isalnum()]
+        # Removes all stop words from text
+        words = [word for word in words if word not in stopwords.words('english')]
+        '''
+            Lemmatization usually refers to doing things properly with 
+            the use of a vocabulary and morphological analysis of words, 
+            normally aiming to remove inflectional endings only and
+            to return the base or dictionary form of a word, which is known as the lemma
+            * pos is the part of speech i want to convert the word to, 'n' = noun
+        '''
+        words = [lemmatizer.lemmatize(word) for word in words]
+        if join_text:
+            words = ' '.join(words)
+        return words
+
+    @staticmethod
+    def translate_text(text, dest_language="en"):
+        # Used to translate using the googletrans library
+        import json
+        translator = googletrans.Translator()
+        try:
+            translation = translator.translate(text=text, dest=dest_language)
+            translation.src = language_identifier[translation.src]
+        except json.decoder.JSONDecodeError:
+            # api call restriction
+            process = subprocess.Popen(["nordvpn", "d"], stdout=subprocess.PIPE)
+            process.wait()
+            process = subprocess.Popen(["nordvpn", "c", "Europe"], stdout=subprocess.PIPE)
+            process.wait()
+            return Process_Data.translate_text(text=text, dest_language=dest_language)
+        return translation
+
+    @staticmethod
+    def remove_emojis(text):
+        #import emoji
+        #text = emoji.get_emoji_regexp().sub(u'', text)
+        import re
+        emoji_pattern = re.compile("["
+           u"\U0001F600-\U0001F64F"  # emoticons
+           u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+           u"\U0001F680-\U0001F6FF"  # transport & map symbols
+           u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+           u"\U0001F1F2-\U0001F1F4"  # Macau flag
+           u"\U0001F1E6-\U0001F1FF"  # flags
+           u"\U0001F600-\U0001F64F"
+           u"\U00002702-\U000027B0"
+           u"\U000024C2-\U0001F251"
+           u"\U0001f926-\U0001f937"
+           u"\U0001F1F2"
+           u"\U0001F1F4"
+           u"\U0001F620"
+           u"\u200d"
+           u"\u2640-\u2642"
+           "]+", flags=re.UNICODE)
+        return emoji_pattern.sub(r'', text)

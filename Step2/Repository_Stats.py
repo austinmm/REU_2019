@@ -2,6 +2,7 @@
 from Step2.Research_Stats import Research_Stats
 from Process_Data import Process_Data
 
+
 class Repository_Stats(Research_Stats):
     Header_Names = ["score", "uses multiple languages", "languages used", "main language",
                     "language dictionary", "valid language combinations",
@@ -27,7 +28,8 @@ class Repository_Stats(Research_Stats):
         self.uses_multiple_languages = True if self.languages_used > 1 else False
         # Dictionary of language combos that include this language in the key with all values set to 1
         self.language_combinations = Process_Data.create_unique_combo_list(
-            self.language_dictionary, self.languages_used
+            self.language_dictionary, self.languages_used,
+            max_combo_count=Repository_Stats.Combo_Length_Limit, min_combo_count=2
         )
         # List of topics used in current repository instance
         self.topics_list = repo.topics
@@ -48,8 +50,8 @@ class Repository_Stats(Research_Stats):
         # This boolean indicates if the repository language use count was valid to compute language_combinations
         self.valid_language_combinations = True if self.languages_used <= Repository_Stats.Combo_Length_Limit else False
 
-    def create_row(self):
-        # "Score"
+    def create_row(self, key=''):
+        # "score"
         values = [self.score]
 
         # "uses multiple languages"

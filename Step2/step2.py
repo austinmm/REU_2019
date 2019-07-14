@@ -5,7 +5,7 @@ from Step2.Repository_Stats import Repository_Stats
 
 
 if __name__ == '__main__':
-    Repository_Stats.Combo_Length_Limit = 18
+    Repository_Stats.Combo_Length_Limit = 5
     print("Which Research Question Would you like to Collect/Prepare Data for?\n1.) RQ1\n2.) RQ2\nChoice:", end=' ')
     choice = int(input())
     research_data = None
@@ -20,4 +20,4 @@ if __name__ == '__main__':
     valid_combination_percent = research_data.valid_language_combination_percent()
     print("%.2f%% of repositories used %d or less languages"
           % (valid_combination_percent, Repository_Stats.Combo_Length_Limit)
-      )
+    )

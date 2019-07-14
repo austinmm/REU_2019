@@ -12,3 +12,6 @@ class RQ2_Results(Research_Results):
 
     def load_data(self, file_name="Descriptions"):
         self.description_stats = Process_Data.read_in_data(self.input_path, file_name, "Description")
+
+    def vectorize_strings(self):
+        pass

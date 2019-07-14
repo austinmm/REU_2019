@@ -33,6 +33,8 @@ class Collect_Research_Data(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def write_data(self):
+        if self.file_name != "Revised_Repos":
+            return
         print("Writing Repository Data to CSV File...")
         file_name = self.output_path + 'Repositories.csv'
         with open(file_name, 'w') as csv_file:
