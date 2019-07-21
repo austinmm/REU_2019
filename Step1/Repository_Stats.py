@@ -4,7 +4,8 @@ from Process_Data import Process_Data
 
 
 class Repository_Stats(Research_Stats):
-    Header_Names = ["score", "uses multiple languages", "languages used", "main language",
+
+    Header_Names = ["id", "uses multiple languages", "languages used", "main language",
                     "language dictionary", "valid language combinations",
                     "language combinations", "topics used",
                     "topics list", "description", "owner type", "open issues",
@@ -14,10 +15,10 @@ class Repository_Stats(Research_Stats):
     Combo_Length_Limit = 18
 
     def __init__(self, repo):
-        # This value contains the relevance score of the repository on Github
-        self.score = repo.score
+        # This is a key that is unique to this repository only
+        self.id = repo.id
         # Dictionary of languages as keys with values the amount of bytes written in said language
-        self.language_dictionary = repo.language
+        self.language_dictionary = repo.language_dictionary
         # Amount of bytes written in this language in the current repository instance
         self.byte_size = sum(list(self.language_dictionary.values()))
         # String value of the primary language, in bytes written, of the current repo
@@ -38,7 +39,7 @@ class Repository_Stats(Research_Stats):
         # The description of the repository
         self.description = str(repo.description)
         # The type of owner of the repository
-        self.owner_type = repo.owner['type']
+        self.owner_type = repo.owner_type
         # The amount of open issues the repository has
         self.open_issues = repo.open_issues
         # The amount of stars the repository has
@@ -51,8 +52,8 @@ class Repository_Stats(Research_Stats):
         self.valid_language_combinations = True if self.languages_used <= Repository_Stats.Combo_Length_Limit else False
 
     def create_row(self, key=''):
-        # "score"
-        values = [self.score]
+        # "id"
+        values = [self.id]
 
         # "uses multiple languages"
         data = self.uses_multiple_languages

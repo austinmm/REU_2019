@@ -30,4 +30,5 @@ if __name__ == '__main__':
     elif choice == 2:
         file_name = "Descriptions"
         research_data = RQ2_Results(input_path, output_path)
-    research_data.load_data(file_name)
+        research_data.cluster_text()
+    #research_data.load_data(file_name)

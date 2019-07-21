@@ -1,12 +1,5 @@
 ##### Process_Data.py #####
 
-# Converts a dictionary into a class (tuple)
-from collections import namedtuple  # namedtuple()
-import numpy as np  # percentile()
-# Checks if a path to file exist
-from pathlib import Path
-# Communicate with linux terminal
-import subprocess
 # Safely converts strings into the correct python object
 import ast  # literal_eval()
 import statistics  # mean(), stdev(), variance()
@@ -27,6 +20,8 @@ from nltk.stem import WordNetLemmatizer
 # Reads/Writes in a CSV formatted file
 import csv  # reader()
 import sys  # sys.maxsize
+# Regex
+import re
 # Allows code to read in large CSV files
 csv.field_size_limit(sys.maxsize)
 # Used to convert Language Codes to Language names
@@ -36,6 +31,7 @@ lemmatizer = WordNetLemmatizer()
 
 
 class Process_Data:
+    Server_Num = 201
 
     @staticmethod
     def create_dictionary(keys, values):
@@ -97,14 +93,20 @@ class Process_Data:
         return combos
 
     @staticmethod
+    def check_if_path_exist(file):
+        # Checks if a path to file exist
+        from pathlib import Path
+        file_path = Path(file)
+        if file_path.is_file() == False:
+            error = "No such path to file: '" + file + "'"
+            sys.exit(error)
+
+    @staticmethod
     # This function reads in all the rows of a csv file and prepares them for processing
     def read_in_data(file_path, file_name, class_name):
         file_name = file_path + file_name + '.csv'
-        file_path = Path(file_name)
+        Process_Data.check_if_path_exist(file=file_name)
         list_of_objects = []
-        if file_path.is_file() == False:
-            error = "No such file or directory: '" + file_name + "'"
-            sys.exit(error)
         # Opens the CSV file for reading
         with open(file_name, 'r') as csv_file:
             reader = csv.reader(csv_file)
@@ -126,12 +128,22 @@ class Process_Data:
                 for index in range(0, len(row), 1):
                     row[index] = Process_Data.jsonString_to_object(row[index])
                 # This line converts the row into an python objects
-                new_object = namedtuple(class_name, tuple_format.values())(*row)
+                new_object = Process_Data.convert_to_named_tuple(class_name=class_name,
+                                                                 dictionary=tuple_format,
+                                                                 values=row
+                                                                 )
                 list_of_objects.append(new_object)
         return list_of_objects
 
     @staticmethod
+    def convert_to_named_tuple(class_name, dictionary, values):
+        # Converts a dictionary into a class (tuple)
+        from collections import namedtuple  # namedtuple()
+        return namedtuple(class_name, dictionary.values())(*values)
+
+    @staticmethod
     def percentile_partition_dictionary(dictionary, upper_percent, lower_percent):
+        import numpy as np
         results = {}
         values = np.array([float(x) for x in dictionary.values()])
         upper_limit = np.percentile(values, upper_percent, interpolation='higher')
@@ -145,62 +157,101 @@ class Process_Data:
         return results
 
     @staticmethod
-    def clean_text_for_nlp(text, join_text=False):
+    def process_text_for_nlp(text):
+        # Word Tokenization
         words = nltk.word_tokenize(text)
-        # Removes all punctuation, special characters and digits from text
-        # str.isalnum(): Return True if all characters in 'word' are alphanumeric
-        words = [word for word in words if word.isalnum()]
-        # Removes all stop words from text
-        words = [word for word in words if word not in stopwords.words('english')]
+        # Remove Non-alpha text
+        words = [re.sub(r'[^a-z]', '', word) for word in words if word.isalnum()]
+        # Removes all stop words from text and words that are less than two characters in length
+        words = [word for word in words if word not in stopwords.words('english') and len(word) > 1]
         '''
-            Lemmatization usually refers to doing things properly with 
-            the use of a vocabulary and morphological analysis of words, 
-            normally aiming to remove inflectional endings only and
+            Lemmatization: removes inflectional endings only and
             to return the base or dictionary form of a word, which is known as the lemma
-            * pos is the part of speech i want to convert the word to, 'n' = noun
         '''
+        # Word Lemmatization
         words = [lemmatizer.lemmatize(word) for word in words]
-        if join_text:
-            words = ' '.join(words)
         return words
+
+    @staticmethod
+    def clean_text(text):
+        # Change all the text to lower case
+        text = text.lower()
+        # Converts all '+' and '/' to the word 'and'
+        text = re.sub(r'[+|/]', ' and ', text)
+        # Removes all characters besides numbers, letters, and commas
+        text = re.sub(r'[^\w\d,]', ' ', text)
+        # Word Tokenization
+        words = text.split()
+        # Joins tokenized string into one string
+        text = ' '.join(words)
+        return text
 
     @staticmethod
     def translate_text(text, dest_language="en"):
         # Used to translate using the googletrans library
-        import json
         translator = googletrans.Translator()
+        import json; import emoji; import requests
+        # Removes emojis that would cause errors during translation
+        text = emoji.get_emoji_regexp().sub(r'', text)
         try:
             translation = translator.translate(text=text, dest=dest_language)
-            translation.src = language_identifier[translation.src]
-        except json.decoder.JSONDecodeError:
+            translation.src = language_identifier[translation.src.lower()]
+        except requests.exceptions.ConnectionError as e:
+            Process_Data.change_ip_address()
+            return Process_Data.translate_text(text=text, dest_language=dest_language)
+        except json.decoder.JSONDecodeError as e:
             # api call restriction
-            process = subprocess.Popen(["nordvpn", "d"], stdout=subprocess.PIPE)
-            process.wait()
-            process = subprocess.Popen(["nordvpn", "c", "Europe"], stdout=subprocess.PIPE)
-            process.wait()
+            Process_Data.change_ip_address()
             return Process_Data.translate_text(text=text, dest_language=dest_language)
         return translation
 
     @staticmethod
-    def remove_emojis(text):
-        #import emoji
-        #text = emoji.get_emoji_regexp().sub(u'', text)
-        import re
-        emoji_pattern = re.compile("["
-           u"\U0001F600-\U0001F64F"  # emoticons
-           u"\U0001F300-\U0001F5FF"  # symbols & pictographs
-           u"\U0001F680-\U0001F6FF"  # transport & map symbols
-           u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
-           u"\U0001F1F2-\U0001F1F4"  # Macau flag
-           u"\U0001F1E6-\U0001F1FF"  # flags
-           u"\U0001F600-\U0001F64F"
-           u"\U00002702-\U000027B0"
-           u"\U000024C2-\U0001F251"
-           u"\U0001f926-\U0001f937"
-           u"\U0001F1F2"
-           u"\U0001F1F4"
-           u"\U0001F620"
-           u"\u200d"
-           u"\u2640-\u2642"
-           "]+", flags=re.UNICODE)
-        return emoji_pattern.sub(r'', text)
+    def change_ip_address():
+        # Communicate with linux terminal
+        import subprocess
+        process = subprocess.Popen(["nordvpn", "d"], stdout=subprocess.PIPE)
+        process.wait()
+        server = "au" + str(Process_Data.Server_Num)
+        Process_Data.Server_Num += 1
+        process = subprocess.Popen(["nordvpn", "c", server], stdout=subprocess.PIPE)
+        process.wait()
+
+    @staticmethod
+    def search_wikipedia(text):
+        import wikipedia
+        try:
+            result = wikipedia.search(text, results=3, suggestion=False)
+            return None if result is None or result == [] else result[0].lower()
+        except wikipedia.exceptions.PageError:
+            result = wikipedia.suggest(text)
+            return None if result is None else result.lower()
+        except wikipedia.exceptions.DisambiguationError as other_options:
+            return Process_Data.search_wikipedia(other_options.options[0])
+        except wikipedia.exceptions.HTTPTimeoutError:
+            Process_Data.change_ip_address()
+            return Process_Data.search_wikipedia(text)
+
+    @staticmethod
+    def store_data(file_path, file_name, data):
+        # Saves objects to be loaded at a later time
+        import pickle
+        # Its important to use binary mode
+        file = file_path + file_name
+        # Opens to write binary
+        pickle_file = open(file, 'wb')
+        # source, destination
+        pickle.dump(data, pickle_file)
+        pickle_file.close()
+
+    @staticmethod
+    def load_data(file_path, file_name):
+        # Saves objects to be loaded at a later time
+        import pickle
+        # Its important to use binary mode
+        file = file_path + file_name
+        # Opens to write binary
+        pickle_file = open(file, 'rb')
+        # source, destination
+        data = pickle.load(file=pickle_file)
+        pickle_file.close()
+        return data

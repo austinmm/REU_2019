@@ -2,6 +2,7 @@
 import abc  # abc.ABCMeta, @abc.abstractmethod
 
 class Research_Stats(metaclass=abc.ABCMeta):
+
     AP  = "All-Languages"
     SLP = "Single-Languages"
     MLP = "Multiple-Languages"
