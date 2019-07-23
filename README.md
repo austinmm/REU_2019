@@ -4,7 +4,7 @@ This REU program is hosted by the School of Electrical Engineering and Computer 
 ## Research Questions
 These are the fundamental questions driving our research and data collection efforts.
 
-### RQ1: What are the Overall LanLanguagefuage Use Statistics
+### RQ1: What are the Overall Language Use Statistics
 1.  How many languages by average are used by these sampled projects? 
 2.  What is the distribution of the languages used across all these projects in Mentions?
 3.  What is the distribution of the languages used across all these projects in Bytes?
