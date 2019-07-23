@@ -29,7 +29,6 @@ class Collect_Research_Data(metaclass=abc.ABCMeta):
             writer.writerow(self.get_header())
             # Writes all the values of each index of dict_repos as separate rows in the csv file
             for key, value in self.research_data.items():
-                # If the repo is not a multiple-language project then we ignore it
                 row = value.create_row(key=self.file_name)
                 writer.writerow(row)
         csv_file.close()
@@ -39,7 +38,11 @@ class Collect_Research_Data(metaclass=abc.ABCMeta):
         print("Abstract Method that is implemented by inheriting classes")
 
     def save_objects(self):
-        Process_Data.store_data(file_path=self.file_path, file_name=self.file_name, data=self.research_data)
+        # Converts all class objects to list of values
+        updated_research_data = [value.create_row() for value in self.research_data.values()]
+        # Creates a dictionary for every object
+        updated_research_data = Process_Data.create_dictionary(keys=self.get_header(), values=updated_research_data)
+        Process_Data.store_data(file_path=self.file_path, file_name=self.file_name, data=updated_research_data)
 
     def process_data(self, list_of_repos):
         pbar = ProgressBar()

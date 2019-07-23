@@ -1,7 +1,5 @@
 ##### Process_Data.py #####
 
-# Safely converts strings into the correct python object
-import ast  # literal_eval()
 import statistics  # mean(), stdev(), variance()
 # Finds all unique combinations within a list
 from itertools import combinations  # combinations()
@@ -51,6 +49,8 @@ class Process_Data:
 
     @staticmethod
     def jsonString_to_object(json_string):
+        # Safely converts strings into the correct python object
+        import ast  # literal_eval()
         value = ''
         try:
             value = ast.literal_eval(json_string)
@@ -101,6 +101,18 @@ class Process_Data:
             error = "No such path to file: '" + file + "'"
             sys.exit(error)
 
+
+    @staticmethod
+    def named_tuple_format(key_list):
+        # Creates the field names for our python object from csv header row fields
+        tuple_format = {}
+        for index in range(0, len(key_list), 1):
+            key = key_list[index].replace(" ", "_").lower()
+            # key is index of the column and value is the column name
+            tuple_format[index] = key  # i.e. {1: 'name', 2: 'id'}
+        return tuple_format
+
+
     @staticmethod
     # This function reads in all the rows of a csv file and prepares them for processing
     def read_in_data(file_path, file_name, class_name):
@@ -119,10 +131,7 @@ class Process_Data:
                 if is_header_row:
                     is_header_row = False  # We only want to execute this conditional once
                     # Creates the field names for our python object from csv header row fields
-                    for index in range(0, len(row), 1):
-                        field = row[index].replace(" ", "_")
-                        # key is index of the column and value is the column name
-                        tuple_format[index] = field  # i.e. {1: 'name', 2: 'id'}
+                    tuple_format = Process_Data.named_tuple_format(row)
                     continue
                 # Formats the row's fields into their correct type
                 for index in range(0, len(row), 1):

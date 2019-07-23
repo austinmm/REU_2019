@@ -10,7 +10,7 @@ class Collect_RQ1_Data(Collect_Research_Data):
         super(Collect_RQ1_Data, self).__init__(file_name=file_name, file_path=file_path)
 
     def update_statistics(self, current_repository):
-        for language in current_repository.language_dict:
+        for language in current_repository.language_dictionary:
             if language not in self.research_data:
                 self.research_data[language] = Language_Stats(language)
             self.research_data[language].update(current_repository)

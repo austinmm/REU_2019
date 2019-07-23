@@ -5,10 +5,10 @@ from Step2.Research_Stats import Research_Stats
 
 class Language_Stats(Research_Stats):
 
-    Header_Names = ["Language Name", "Occurrences", "Most Frequent Language Combination",
-                    "Most Frequent Topic", "Primary Language Occurrences", "Language Ranking Statistics",
-                    "Bytes Written Statistics", "Byte Distribution Statistics",
-                    "Languages Used Statistics", "Topics Used Statistics"]
+    Header_Names = ["language name", "occurrences", "most frequent language combination",
+                    "most frequent topic", "primary language occurrences", "language ranking statistics",
+                    "bytes written statistics", "byte distribution statistics",
+                    "languages used statistics", "topics used statistics"]
 
     def __init__(self, language):
         self.language_name = language

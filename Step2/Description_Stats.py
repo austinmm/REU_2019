@@ -4,8 +4,6 @@ from Process_Data import Process_Data
 from Step2.Research_Stats import Research_Stats
 # Wrapper for the nltk library
 from textblob import TextBlob
-# Searches wikipedia for existence of words
-import wikipedia
 
 
 class Description_Stats(Research_Stats):
@@ -26,7 +24,6 @@ class Description_Stats(Research_Stats):
         self.subjects = list(text_blob.noun_phrases)
         # Obtains a prepared TextBlob object to apply nlp algorithms to description
         self.processed_text = Process_Data.process_text_for_nlp(self.description)
-        #self.check_subject_existence()
         # Boolean that represents if this repository uses multiple languages or not
         self.uses_multiple_languages = repo.uses_multiple_languages
         # Amount of languages used in current repository instance
