@@ -13,4 +13,4 @@ if __name__ == '__main__':
     elif choice == 2:
         research_data = Collect_RQ2_Data(file_path=file_path)
     list_of_repos = Process_Data.load_data(file_path='../Data/Step2_Data/', file_name='Repository_Stats')
-    research_data.process_data(list_of_repos=list_of_repos.values())
+    research_data.process_data(list_of_repos=list_of_repos)

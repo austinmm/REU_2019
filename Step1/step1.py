@@ -1,9 +1,9 @@
 from Step1.Collect_Repository_Data import Collect_Repository_Data
 from Step1.Github_API import Github_API
-from Step1.Repository_Stats import Repository_Stats
+from Step2.Research_Stats import Research_Stats
 
 if __name__ == '__main__':
-    Repository_Stats.Combo_Length_Limit = 5
+    Research_Stats.Combo_Length_Limit = 20
     # Retrieves repo data from Github by page
     github_info = Github_API()
     github_info.execute_repository_query()

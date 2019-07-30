@@ -87,7 +87,7 @@ class Process_Data:
         if dict_count < min_combo_count or dict_count > max_combo_count:
             return combos
         for i in range(min_combo_count, dict_count + 1, 1):
-            sub_combo = [list(x) for x in combinations(items, i)]
+            sub_combo = [list(x) for x in combinations(items, i)]#combinations_with_replacement
             if len(sub_combo) > 0:
                 combos.extend(sub_combo)
         return combos

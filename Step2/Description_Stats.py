@@ -1,19 +1,19 @@
 ##### Description_Stats.py #####
 
 from Process_Data import Process_Data
-from Step2.Research_Stats import Research_Stats
 # Wrapper for the nltk library
 from textblob import TextBlob
 
 
-class Description_Stats(Research_Stats):
-
-    Header_Names = ["description", "natural language", "subjects",
-                    "processed text", "uses multiple languages",
+class Description_Stats():
+    '''
+    Header_Names = ["repository id", "description", "natural language",
+                    "subjects", "processed text", "uses multiple languages",
                     "languages used", "main language",
                     "language combinations", "topics used", "topics list"]
-
+    '''
     def __init__(self, repo):
+        self.repository_id = repo.id
         translation = Process_Data.translate_text(text=repo.description)
         # The most likely natural language the description was written in
         self.natural_language = translation.src
@@ -30,24 +30,21 @@ class Description_Stats(Research_Stats):
         self.languages_used = repo.languages_used
         # String value of the primary language, in bytes written, of the current repo
         self.main_language = repo.main_language
-        # Dictionary of language combos that include this language in the key with all values set to 1
-        self.language_combinations = repo.language_combinations + [lang for lang in repo.language_dictionary]
+        # List of language combos
+        self.language_combinations = [' '.join(combo) for combo in repo.language_combinations]
         # Amount of topics used in current repository instance
         self.topics_used = repo.topics_used
         # List of topics used in current repository instance
         self.topics_list = repo.topics_list
 
-    def check_subject_existence(self):
-        revised_subjects = []
-        for subject in self.subjects:
-            search_result = Process_Data.search_wikipedia(subject)
-            if search_result is not None:
-                revised_subjects.append(search_result)
-        self.subjects = list(set(revised_subjects))
-
+    '''
     def create_row(self, key=''):
+        # "Repository Id"
+        values = [self.repository_id]
+
         # "Description"
-        values = [self.description]
+        data = self.description
+        values.append(data)
 
         # "Natural Language"
         data = self.natural_language
@@ -86,3 +83,4 @@ class Description_Stats(Research_Stats):
         values.append(data)
 
         return values
+    '''

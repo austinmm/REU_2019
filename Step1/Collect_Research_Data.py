@@ -4,6 +4,7 @@ from Process_Data import Process_Data
 # Allows for abstract classes
 import abc  # abc.ABCMeta, @abc.abstractmethod
 from progressbar import ProgressBar  # ProgressBar()
+from types import SimpleNamespace
 # Reads/Writes in a CSV formatted file
 import csv  # reader()
 import sys  # sys.maxsize
@@ -11,8 +12,9 @@ import sys  # sys.maxsize
 csv.field_size_limit(sys.maxsize)
 # Displays a progress bar while looping through an iterable object
 
-
 class Collect_Research_Data(metaclass=abc.ABCMeta):
+
+    Language_Combination_Limit = 20
 
     def __init__(self, file_name, file_path):
         self.file_name = file_name
@@ -20,37 +22,48 @@ class Collect_Research_Data(metaclass=abc.ABCMeta):
         self.research_data = {}
 
     @abc.abstractmethod
-    def write_data(self):
+    def save_data(self):
+        self.__write_data_to_csv()
+        self.__serialize_objects()
+
+    def __write_data_to_csv(self):
         print("Writing Data to CSV File...")
         file = self.file_path + self.file_name + '.csv'
         with open(file, 'w') as csv_file:
             writer = csv.writer(csv_file)
             # Writes the dictionary keys to the csv file
-            writer.writerow(self.get_header())
+            writer.writerow(self._get_header())
             # Writes all the values of each index of dict_repos as separate rows in the csv file
             for key, value in self.research_data.items():
-                row = value.create_row(key=self.file_name)
+                row = self._object_to_list(value)
                 writer.writerow(row)
         csv_file.close()
 
     @abc.abstractmethod
-    def get_header(self):
-        print("Abstract Method that is implemented by inheriting classes")
+    def _object_to_list(self, value):
+        return list(value.__dict__.values())
 
-    def save_objects(self):
+    @abc.abstractmethod
+    def _object_to_dict(self, value):
+        return value.__dict__
+
+    @abc.abstractmethod
+    def _get_header(self):
+        return list(list(self.research_data.values())[0].__dict__.keys())
+
+    def __serialize_objects(self):
+        print("Storing Serialized Object in File...")
         # Converts all class objects to list of values
-        updated_research_data = [value.create_row() for value in self.research_data.values()]
-        # Creates a dictionary for every object
-        updated_research_data = Process_Data.create_dictionary(keys=self.get_header(), values=updated_research_data)
-        Process_Data.store_data(file_path=self.file_path, file_name=self.file_name, data=updated_research_data)
+        serialized_objects = {key: self._object_to_dict(value) for key, value in self.research_data.items()}
+        # Pickles data
+        Process_Data.store_data(file_path=self.file_path, file_name=self.file_name, data=serialized_objects)
 
     def process_data(self, list_of_repos):
         pbar = ProgressBar()
-        for repo in pbar(list_of_repos):
-            self.update_statistics(repo)
-        self.write_data()
-        self.save_objects()
+        for current_repository in pbar(list_of_repos):
+            current_repository = SimpleNamespace(**current_repository)
+            self._update_statistics(current_repository)
 
     @abc.abstractmethod
-    def update_statistics(self, current_repository):
+    def _update_statistics(self, current_repository):
         print("Abstract Method that is implemented by inheriting classes")
