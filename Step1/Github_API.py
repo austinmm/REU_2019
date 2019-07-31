@@ -3,6 +3,12 @@ from datetime import datetime, timedelta
 from time import sleep
 import requests
 from progressbar import ProgressBar
+# Reads/Writes in a CSV formatted file
+import csv  # reader()
+import sys  # sys.maxsize
+# Allows code to read in large CSV files
+csv.field_size_limit(sys.maxsize)
+# Displays a progress bar while looping through an iterable object
 
 """
        * Overall Github API V3 Guide: https://developer.github.com/v3/
@@ -34,8 +40,10 @@ class Github_API():
                      'stargazers_count', 'language_dictionary',
                      'topics', 'description', 'owner_type']
 
-    def __init__(self):
+    def __init__(self, file_name='Github_Repositories', file_path='Data/Step1_Data/'):
         self.list_of_repositories = []
+        self.file_name = file_name
+        self.file_path = file_path
         self.date_last_updated = ""
         self.date_created = ""
         self.username = ""
@@ -43,7 +51,7 @@ class Github_API():
         self.orders = ["asc", "desc"]
         self.stars = ["4273..*", "2338..4272", "1569..2337", "1172..1568", "915..1171"]
 
-    def execute_repository_query(self, file_path):
+    def execute_repository_query(self):
         # Gets api header and param values
         self.collect_http_info()
         # Obtains initial 'unclean' repositories
@@ -63,7 +71,8 @@ class Github_API():
         final_repo_count = len(self.list_of_repositories)
         print("Valid Repositories Remaining %d of %d [%.2f%%]" % (final_repo_count, original_repo_count,
                                                                   (final_repo_count / original_repo_count) * 100))
-        Process_Data.store_data(file_path=file_path, file_name='Repository_List', data=self.list_of_repositories)
+        Process_Data.store_data(file_path=self.file_path, file_name='Repository_List', data=self.list_of_repositories)
+        self.write_data()
 
     def update_repositories(self):
         print("Updating Repository Data...")
@@ -183,3 +192,18 @@ class Github_API():
                     else:
                         # If 'items' is not a valid key then there are no more repos to read in
                         break
+
+    def write_data(self):
+        print("Writing Data to CSV File...")
+        file = self.file_path + self.file_name + '.csv'
+        with open(file, 'w') as csv_file:
+            writer = csv.writer(csv_file)
+            # Writes the dictionary keys to the csv file
+            writer.writerow(Github_API.Fields_Wanted)
+            # Writes all the values of each index of dict_repos as separate rows in the csv file
+            for repository in self.list_of_repositories:
+                # If the repo is not a multiple-language project then we ignore it
+                row = repository.values()
+                writer.writerow(row)
+        csv_file.close()
+

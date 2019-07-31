@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Large Files
+Data/Step2_Data/
+
 # C extensions
 *.so
 
